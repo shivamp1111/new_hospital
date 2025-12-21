@@ -20,7 +20,15 @@ connectCloudinary()
 
 // middlewares
 app.use(express.json())
-app.use(cors())
+const allowedOrigins = [
+  "https://new-hospital-peach.vercel.app/", // Your Vercel URL
+  "http://localhost:5173" // Keep this for local development
+];
+
+app.use(cors({
+    origin: allowedOrigins,
+    credentials: true
+}));
 
 // api endpoints
 app.use("/api/user", userRouter)
