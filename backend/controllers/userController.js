@@ -8,36 +8,27 @@ import { v2 as cloudinary } from 'cloudinary'
 import stripe from "stripe";
 import razorpay from 'razorpay';
 
-// Gateway Initialize
-const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY)
-const razorpayInstance = new razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
-})
+// NOTE: Global instances removed to prevent startup errors. 
+// They are now initialized inside the specific functions below.
 
 // API to register user
 const registerUser = async (req, res) => {
-
     try {
         const { name, email, password } = req.body;
 
-        // checking for all data to register user
         if (!name || !email || !password) {
             return res.json({ success: false, message: 'Missing Details' })
         }
 
-        // validating email format
         if (!validator.isEmail(email)) {
             return res.json({ success: false, message: "Please enter a valid email" })
         }
 
-        // validating strong password
         if (password.length < 8) {
             return res.json({ success: false, message: "Please enter a strong password" })
         }
 
-        // hashing user password
-        const salt = await bcrypt.genSalt(10); // the more no. round the more time it will take
+        const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt)
 
         const userData = {
@@ -60,7 +51,6 @@ const registerUser = async (req, res) => {
 
 // API to login user
 const loginUser = async (req, res) => {
-
     try {
         const { email, password } = req.body;
         const user = await userModel.findOne({ email })
@@ -86,7 +76,6 @@ const loginUser = async (req, res) => {
 
 // API to get user profile data
 const getProfile = async (req, res) => {
-
     try {
         const { userId } = req.body
         const userData = await userModel.findById(userId).select('-password')
@@ -101,9 +90,7 @@ const getProfile = async (req, res) => {
 
 // API to update user profile
 const updateProfile = async (req, res) => {
-
     try {
-
         const { userId, name, phone, address, dob, gender } = req.body
         const imageFile = req.file
 
@@ -114,11 +101,8 @@ const updateProfile = async (req, res) => {
         await userModel.findByIdAndUpdate(userId, { name, phone, address: JSON.parse(address), dob, gender })
 
         if (imageFile) {
-
-            // upload image to cloudinary
             const imageUpload = await cloudinary.uploader.upload(imageFile.path, { resource_type: "image" })
             const imageURL = imageUpload.secure_url
-
             await userModel.findByIdAndUpdate(userId, { image: imageURL })
         }
 
@@ -132,9 +116,7 @@ const updateProfile = async (req, res) => {
 
 // API to book appointment 
 const bookAppointment = async (req, res) => {
-
     try {
-
         const { userId, docId, slotDate, slotTime } = req.body
         const docData = await doctorModel.findById(docId).select("-password")
 
@@ -144,7 +126,6 @@ const bookAppointment = async (req, res) => {
 
         let slots_booked = docData.slots_booked
 
-        // checking for slot availablity 
         if (slots_booked[slotDate]) {
             if (slots_booked[slotDate].includes(slotTime)) {
                 return res.json({ success: false, message: 'Slot Not Available' })
@@ -175,7 +156,6 @@ const bookAppointment = async (req, res) => {
         const newAppointment = new appointmentModel(appointmentData)
         await newAppointment.save()
 
-        // save new slots data in docData
         await doctorModel.findByIdAndUpdate(docId, { slots_booked })
 
         res.json({ success: true, message: 'Appointment Booked' })
@@ -184,28 +164,22 @@ const bookAppointment = async (req, res) => {
         console.log(error)
         res.json({ success: false, message: error.message })
     }
-
 }
 
 // API to cancel appointment
 const cancelAppointment = async (req, res) => {
     try {
-
         const { userId, appointmentId } = req.body
         const appointmentData = await appointmentModel.findById(appointmentId)
 
-        // verify appointment user 
         if (appointmentData.userId !== userId) {
             return res.json({ success: false, message: 'Unauthorized action' })
         }
 
         await appointmentModel.findByIdAndUpdate(appointmentId, { cancelled: true })
 
-        // releasing doctor slot 
         const { docId, slotDate, slotTime } = appointmentData
-
         const doctorData = await doctorModel.findById(docId)
-
         let slots_booked = doctorData.slots_booked
 
         slots_booked[slotDate] = slots_booked[slotDate].filter(e => e !== slotTime)
@@ -220,10 +194,9 @@ const cancelAppointment = async (req, res) => {
     }
 }
 
-// API to get user appointments for frontend my-appointments page
+// API to list user appointments
 const listAppointment = async (req, res) => {
     try {
-
         const { userId } = req.body
         const appointments = await appointmentModel.find({ userId })
 
@@ -235,10 +208,11 @@ const listAppointment = async (req, res) => {
     }
 }
 
+// --- PAYMENT INTEGRATIONS (Updated Logic) ---
+
 // API to make payment of appointment using razorpay
 const paymentRazorpay = async (req, res) => {
     try {
-
         const { appointmentId } = req.body
         const appointmentData = await appointmentModel.findById(appointmentId)
 
@@ -246,14 +220,18 @@ const paymentRazorpay = async (req, res) => {
             return res.json({ success: false, message: 'Appointment Cancelled or not found' })
         }
 
-        // creating options for razorpay payment
+        // Initialize Razorpay Instance HERE to avoid env errors
+        const razorpayInstance = new razorpay({
+            key_id: process.env.RAZORPAY_KEY_ID,
+            key_secret: process.env.RAZORPAY_KEY_SECRET,
+        })
+
         const options = {
             amount: appointmentData.amount * 100,
             currency: process.env.CURRENCY,
             receipt: appointmentId,
         }
 
-        // creation of an order
         const order = await razorpayInstance.orders.create(options)
 
         res.json({ success: true, order })
@@ -268,6 +246,13 @@ const paymentRazorpay = async (req, res) => {
 const verifyRazorpay = async (req, res) => {
     try {
         const { razorpay_order_id } = req.body
+
+        // Initialize Razorpay Instance HERE
+        const razorpayInstance = new razorpay({
+            key_id: process.env.RAZORPAY_KEY_ID,
+            key_secret: process.env.RAZORPAY_KEY_SECRET,
+        })
+
         const orderInfo = await razorpayInstance.orders.fetch(razorpay_order_id)
 
         if (orderInfo.status === 'paid') {
@@ -286,7 +271,6 @@ const verifyRazorpay = async (req, res) => {
 // API to make payment of appointment using Stripe
 const paymentStripe = async (req, res) => {
     try {
-
         const { appointmentId } = req.body
         const { origin } = req.headers
 
@@ -296,6 +280,8 @@ const paymentStripe = async (req, res) => {
             return res.json({ success: false, message: 'Appointment Cancelled or not found' })
         }
 
+        // Initialize Stripe Instance HERE to avoid env errors
+        const stripeInstance = new stripe(process.env.STRIPE_SECRET_KEY)
         const currency = process.env.CURRENCY.toLocaleLowerCase()
 
         const line_items = [{
@@ -324,9 +310,9 @@ const paymentStripe = async (req, res) => {
     }
 }
 
+// API to verify Stripe Payment (Original Logic)
 const verifyStripe = async (req, res) => {
     try {
-
         const { appointmentId, success } = req.body
 
         if (success === "true") {
@@ -340,7 +326,6 @@ const verifyStripe = async (req, res) => {
         console.log(error)
         res.json({ success: false, message: error.message })
     }
-
 }
 
 export {

@@ -1,6 +1,7 @@
+import 'dotenv/config'
 import express from "express"
 import cors from 'cors'
-import 'dotenv/config'
+
 import connectDB from "./config/mongodb.js"
 import connectCloudinary from "./config/cloudinary.js"
 import userRouter from "./routes/userRoute.js"
@@ -21,7 +22,7 @@ connectCloudinary()
 // middlewares
 app.use(express.json())
 const allowedOrigins = [
-  "https://new-hospital-peach.vercel.app/", // Your Vercel URL
+  "https://new-hospital-peach.vercel.app", // Your Vercel URL
   "http://localhost:5173" // Keep this for local development
 ];
 
