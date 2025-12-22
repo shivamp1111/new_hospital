@@ -23,7 +23,8 @@ connectCloudinary()
 app.use(express.json())
 const allowedOrigins = [
   "https://new-hospital-peach.vercel.app", // Your Vercel URL
-  "http://localhost:5173" // Keep this for local development
+  "http://localhost:5173",
+  "https://new-hospital-b8rsm2hef-shivam-prjapatis-projects.vercel.app"
 ];
 
 app.use(cors({
