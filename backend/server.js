@@ -25,7 +25,8 @@ const allowedOrigins = [
   "https://new-hospital-peach.vercel.app", // Your Vercel URL
   "http://localhost:5173",
   "https://new-hospital-b8rsm2hef-shivam-prjapatis-projects.vercel.app",
-  "https://new-hospital-3pag-38y1xuqxd-shivam-prjapatis-projects.vercel.app"
+  "https://new-hospital-3pag-38y1xuqxd-shivam-prjapatis-projects.vercel.app",
+  "https://new-hospital-3pag.vercel.app"
 ];
 
 app.use(cors({
